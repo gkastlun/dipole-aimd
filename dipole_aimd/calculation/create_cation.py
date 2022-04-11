@@ -1,4 +1,4 @@
-"""Create structures that have random positions of the cation in an AIMD calculation."""
+"""Create structures that have random positions of the cation and water in an AIMD calculation."""
 
 import os
 import sys
@@ -50,6 +50,8 @@ def add_natoms_to_surface(surface, n_atoms, atoms_all, x_chosen, y_chosen, z_cho
 class CreateCation:
     """Create structures with cations within a cell of given dimensions."""
     yaml_file: str
+    build_structure: bool = False
+    surface_from_file: bool = None
 
     def __post_init__(self):
         """Initialize class."""
@@ -85,10 +87,15 @@ class CreateCation:
 
         # Check if an adsorbate is supplied
         self.adsorbate = inputs.pop('adsorbate', '')
+        
+        if self.build_structure:
+            self.create_surface()
+            if self.adsorbate:
+                self.add_adsorbate_to_surface()
+        else:
+            self.surface = self.surface_from_file
+            self._store_highest_positons()
 
-        self.create_surface()
-        if self.adsorbate:
-            self.add_adsorbate_to_surface()
         self.create_water_and_cation()
         self.create_pre_relaxation_structures()
 
