@@ -24,6 +24,8 @@ class ParseZCoordinate:
     atom_type: str
 
     def __post_init__(self):
+        print('Database parsed is: {}'.format(self.ase_db_file))
+        print('The structure of the {} atom has been analysed.'.format(self.atom_type))
         self.atom_structures = defaultdict(list)
         self._atom_structures = defaultdict(list)
         self.parse_structures()
@@ -39,8 +41,14 @@ class ParseZCoordinate:
         """Store the dipole moment and the structure in a dict of lists in sorted order of sampling."""
         for atoms, run_number, timestep, state in self.get_ase_database():
             # get the z-coordinate of the atom
-            arg_atoms = atoms.get_chemical_symbols() == self.atom_type
+            arg_atoms = [ a == self.atom_type for a in atoms.get_chemical_symbols() ]
             z_coordinate = atoms.positions[arg_atoms][:, 2]
+            if len(z_coordinate) == 1:
+                z_coordinate = z_coordinate[0]
+            elif len(z_coordinate) == 0:
+                z_coordinate = 0
+            else:
+                z_coordinate = list(z_coordinate) 
             self._atom_structures[state].append(np.array([run_number, timestep, z_coordinate]))
     
     def sort_structures(self):
@@ -49,7 +57,10 @@ class ParseZCoordinate:
         for structure, atoms_data in self._atom_structures.items():
             atoms_data = np.array(atoms_data)
             sorted_index = np.lexsort((atoms_data[:, 0], atoms_data[:, 1]))
-            self.atom_structures[structure].append(atoms_data[sorted_index]) 
+            store_atoms = atoms_data[sorted_index]
+            # convert every part of array store_atoms to a list
+            store_atoms = [ i.tolist() for i in store_atoms ]
+            self.atom_structures[str(structure)].append(store_atoms)
 
         # Save the file as a json
         with open(self.output_file, 'w') as handle:
