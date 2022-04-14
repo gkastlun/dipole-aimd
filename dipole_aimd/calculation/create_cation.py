@@ -11,8 +11,12 @@ from ase import Atoms
 from ase import data
 from pathlib import Path
 from copy import deepcopy
-# FIXME: Delete the following import in the end
 from ase.visualize import view
+
+def testprint(*string):
+    """Just a little debugging function, which can be found easily later and
+       deleted throughout"""
+    print(*string)
 
 def get_random_xy_positions(cell, n_atoms):
     """Get random xy positions for the cation."""
@@ -55,6 +59,7 @@ class CreateCation:
     build_structure: bool = False
     surface_from_file: Atoms = None
     adsorbate_from_file: bool = False
+    constrain_adsorbate: bool = True
 
     def __post_init__(self):
         """Initialize class."""
@@ -98,7 +103,11 @@ class CreateCation:
             if self.adsorbate:
                 self.add_adsorbate_to_surface()
         else:
-            self.surface = self.surface_from_file
+            self.surface = self.surface_from_file.copy()
+            #Just making sure there are no default tags present
+            if len(self.surface.constraints):
+                for atom in self.surface:
+                    atom.tag=0
             self._store_highest_positons()
 
             if not self.adsorbate_from_file:
@@ -144,12 +153,31 @@ class CreateCation:
         self._store_highest_positons()
 
     def constrain_atoms(self):
-        """Fix all atoms with a tag of 1"""
-        fix_index = [ a for a in range(len(self.surface)) if self.surface[a].tag == 1]
+        """Add constraints to the final surface, preserving already present
+           constraints"""
+        # TODO: Make this work for other constraints as well
+        fix_index=[]
+        if len(self.surface.constraints):
+            if hasattr(self.surface.constraints[0],'index'):
+                fix_index.extend(self.surface.constraints[0].index)
+            else:
+                print('Warning constraints were identified, but they do not '
+                      'to be supported. Check')
+            print('Constraints were already present in input structure, '
+                  'they will be preserved')
+        else:
+            if self.surface_from_file:
+                print('Constraints are added based on "atom.tag" of Atoms')
+
+        # Fix all atoms with a tag of 1
+        fix_index.extend([ a for a in range(len(self.surface)) if self.surface[a].tag == 1])
+
+        #Check if constraints were already present before and preserve them
         # create the constraint
-        constraint = constraints.FixAtoms(indices=fix_index)
+        if len(fix_index):
+            constraint = constraints.FixAtoms(indices=fix_index)
         # add the constraint to the surface
-        self.surface.set_constraint(constraint)
+            self.surface.set_constraint(constraint)
 
     def add_adsorbate_to_surface(self):
         """If an adsorbate is provided, add it to the surface."""
@@ -164,8 +192,13 @@ class CreateCation:
             # get the position of the topmost metal atom
             position = self.surface.get_positions()[self.top_metal_atom]
             build.add_adsorbate(self.surface, co2, height=height, position = position[0:2])
-            for i in range(4):
-                self.surface[-i].tag = 1
+            if self.constrain_adsorbate:
+                for i in range(1,4):
+                    self.surface[-i].tag = 1
+        else:
+            raise NotImplementedError('Only CO2 is implemented as an adorbate '
+                  'at the moment. Consider providing the surface with '
+                  'adsorbate via the `surface_from_file` keyword.')
 
     def _store_highest_positons(self):
         z_min = self.surface.get_positions()[:, 2].max()
@@ -226,14 +259,13 @@ class CreateCation:
 
     def create_pre_relaxation_structures(self):
         """Create folder structure"""
-        if not len(self.surface.constraints):
-            self.constrain_atoms()
-        else:
-            print('Constaints were already present in input structure, '
-                  'not changing them')
+        #if not len(self.surface.constraints):
+        self.constrain_atoms()
+        #else:
 
         if self.debug_mode:
             view(self.surface)
+            return
 
         index = 1
         no_water = self.water_layers * self.water_per_layer - 1
