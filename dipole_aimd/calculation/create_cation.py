@@ -11,6 +11,8 @@ from ase import Atoms
 from ase import data
 from pathlib import Path
 from copy import deepcopy
+# FIXME: Delete the following import in the end
+from ase.visualize import view
 
 def get_random_xy_positions(cell, n_atoms):
     """Get random xy positions for the cation."""
@@ -85,6 +87,8 @@ class CreateCation:
         self.vacuum = inputs['vacuum']
         # Choose a cutoff fraction to be lowered from the sum of the covalent radii
         self.cutoff_fraction = inputs['cutoff_fraction']
+        # Debug mode where the structures are not created, but shown
+        self.debug_mode = inputs.pop('debug', '')
 
         # Check if an adsorbate is supplied
         self.adsorbate = inputs.pop('adsorbate', '')
@@ -96,6 +100,7 @@ class CreateCation:
         else:
             self.surface = self.surface_from_file
             self._store_highest_positons()
+
             if not self.adsorbate_from_file:
                 self.top_metal_atom = np.argmax(self.surface.positions[:,2])
                 self.add_adsorbate_to_surface()
@@ -226,15 +231,27 @@ class CreateCation:
         else:
             print('Constaints were already present in input structure, '
                   'not changing them')
+
+        if self.debug_mode:
+            view(self.surface)
+
         index = 1
         no_water = self.water_layers * self.water_per_layer - 1
         if self.adsorbate:
             self.metal_name = self.metal_name + '_' + self.adsorbate
-        state_info = self.metal_name + '_' + self.facet + '_' + self.cation + '_' + str(self.dimensions[0]) + 'x' + str(self.dimensions[1]) + '_' + 'cationlayer_' + str(self.layer_of_cation) + '_' + str(no_water) + 'w_' + str(index)
+        state_info = self.metal_name + '_' + self.facet + '_' + \
+                     self.cation + '_' + str(self.dimensions[0]) + \
+                     'x' + str(self.dimensions[1]) + '_' + \
+                     'cationlayer_' + str(self.layer_of_cation) + \
+                     '_' + str(no_water) + 'w_' + str(index)
 
         while os.path.exists(state_info):
             index += 1
-            state_info = self.metal_name + '_' + self.facet + '_' + self.cation + '_' + str(self.dimensions[0]) + 'x' + str(self.dimensions[1]) + '_' + 'cationlayer_' + str(self.layer_of_cation) + '_' + str(no_water) + 'w_' + str(index)
+            state_info = self.metal_name + '_' + self.facet + '_' + \
+                         self.cation + '_' + str(self.dimensions[0]) + \
+                         'x' + str(self.dimensions[1]) + '_' + \
+                         'cationlayer_' + str(self.layer_of_cation) + \
+                         '_' + str(no_water) + 'w_' + str(index)
 
         folder = os.path.join(os.getcwd(), state_info, 'pre_relaxation')
         Path(folder).mkdir(parents=True, exist_ok=True)
