@@ -51,7 +51,8 @@ class CreateCation:
     """Create structures with cations within a cell of given dimensions."""
     yaml_file: str
     build_structure: bool = False
-    surface_from_file: bool = None
+    surface_from_file: Atoms = None
+    adsorbate_from_file: bool = False
 
     def __post_init__(self):
         """Initialize class."""
@@ -70,7 +71,7 @@ class CreateCation:
         self.metal_layers = int(inputs['metal_layers'])
         # get the cation
         self.cation = inputs['cation']
-        # get the layer that the cation must be in 
+        # get the layer that the cation must be in
         self.layer_of_cation = inputs['layer_of_cation']
         # get the dimensions of the bulk structure
         self.dimensions = inputs['dimensions']
@@ -87,7 +88,7 @@ class CreateCation:
 
         # Check if an adsorbate is supplied
         self.adsorbate = inputs.pop('adsorbate', '')
-        
+
         if self.build_structure:
             self.create_surface()
             if self.adsorbate:
@@ -95,6 +96,10 @@ class CreateCation:
         else:
             self.surface = self.surface_from_file
             self._store_highest_positons()
+            if not self.adsorbate_from_file:
+                self.top_metal_atom = np.argmax(self.surface.positions[:,2])
+                self.add_adsorbate_to_surface()
+            #self._store_highest_positons()
 
         self.create_water_and_cation()
         self.create_pre_relaxation_structures()
@@ -123,7 +128,7 @@ class CreateCation:
         for index_fixed in bottom_z_index:
             surface[index_fixed].tag = 1
 
-        # Store the position of the topmost metal atom 
+        # Store the position of the topmost metal atom
         self.top_metal_atom = all_index[np.argmax(all_z_index)]
 
         # Move the surface to the bottom of the cell
@@ -216,7 +221,11 @@ class CreateCation:
 
     def create_pre_relaxation_structures(self):
         """Create folder structure"""
-        self.constrain_atoms()
+        if not len(self.surface.constraints):
+            self.constrain_atoms()
+        else:
+            print('Constaints were already present in input structure, '
+                  'not changing them')
         index = 1
         no_water = self.water_layers * self.water_per_layer - 1
         if self.adsorbate:
