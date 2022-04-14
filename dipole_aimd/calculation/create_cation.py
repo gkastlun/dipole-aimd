@@ -1,11 +1,11 @@
-"""Create structures that have random positions of the cation and water in an AIMD calculation."""
+"""Create structures that have random positions of the cation and water in an
+   AIMD calculation."""
 
 import os
-import sys
 import numpy as np
 import yaml
 from dataclasses import dataclass
-from ase import atom, build
+from ase import build
 from ase import constraints
 from ase import Atoms
 from ase import data
@@ -13,10 +13,12 @@ from pathlib import Path
 from copy import deepcopy
 from ase.visualize import view
 
+
 def testprint(*string):
     """Just a little debugging function, which can be found easily later and
        deleted throughout"""
     print(*string)
+
 
 def get_random_xy_positions(cell, n_atoms):
     """Get random xy positions for the cation."""
@@ -24,22 +26,30 @@ def get_random_xy_positions(cell, n_atoms):
     y_chosen = np.random.uniform(0, np.linalg.norm(cell[1]), n_atoms)
     return x_chosen, y_chosen
 
+
 def check_xy_distance(test_atoms, cutoff_fraction):
     """Check if the xy positions are too close to each other."""
     for i in range(len(test_atoms)):
+        atnum_i = data.atomic_numbers[test_atoms[i].symbol]
         for j in range(i+1, len(test_atoms)):
+            atnum_j = data.atomic_numbers[test_atoms[j].symbol]
             # required minimum distance is the sum of the covalent radii
-            min_cutoff = data.covalent_radii[data.atomic_numbers[test_atoms[i].symbol]] + \
-                            data.covalent_radii[data.atomic_numbers[test_atoms[j].symbol]]
+            min_cutoff = data.covalent_radii[atnum_i] + \
+                data.covalent_radii[atnum_j]
             # Reduce the min cutoff by the cutoff fraction
             min_cutoff = min_cutoff * cutoff_fraction
-            # if np.linalg.norm(test_atoms.get_positions()[i] - test_atoms.get_positions()[j]) < min_cutoff:
-            if test_atoms.get_distance(i,j, mic=True) < min_cutoff:
+            # if (np.linalg.norm(test_atoms.get_positions()[i] -
+            #                    test_atoms.get_positions()[j]) < min_cutoff):
+            if test_atoms.get_distance(i, j, mic=True) < min_cutoff:
                 return False
     return True
 
-def add_natoms_to_surface(surface, n_atoms, atoms_all, x_chosen, y_chosen, z_chosen):
-    """For a given number of atoms, and Atoms extend the original atoms object"""
+
+def add_natoms_to_surface(surface, n_atoms, atoms_all, x_chosen, y_chosen,
+                          z_chosen):
+
+    """For a given number of atoms, and Atoms extend the original atoms
+        object"""
     for j, n_atom in enumerate(range(n_atoms)):
         atoms_to_extend = atoms_all[j]
         # Standardize the positions
@@ -51,6 +61,7 @@ def add_natoms_to_surface(surface, n_atoms, atoms_all, x_chosen, y_chosen, z_cho
 
         # Rotate the molecule randomly
         surface.extend(atoms_to_extend)
+
 
 @dataclass
 class CreateCation:
@@ -90,7 +101,8 @@ class CreateCation:
         self.water_layer_distance = inputs['water_layer_distance']
         # Vacuum based on the slab, important for the dipole correction
         self.vacuum = inputs['vacuum']
-        # Choose a cutoff fraction to be lowered from the sum of the covalent radii
+        # Choose a cutoff fraction to be lowered from the sum of the covalent
+        # radii
         self.cutoff_fraction = inputs['cutoff_fraction']
         # Debug mode where the structures are not created, but shown
         self.debug_mode = inputs.pop('debug', '')
@@ -104,16 +116,16 @@ class CreateCation:
                 self.add_adsorbate_to_surface()
         else:
             self.surface = self.surface_from_file.copy()
-            #Just making sure there are no default tags present
+            # Making sure there are no default tags present, messing with
+            # predefined constraints
             if len(self.surface.constraints):
                 for atom in self.surface:
-                    atom.tag=0
+                    atom.tag = 0
             self._store_highest_positons()
 
             if not self.adsorbate_from_file:
-                self.top_metal_atom = np.argmax(self.surface.positions[:,2])
+                self.top_metal_atom = np.argmax(self.surface.positions[:, 2])
                 self.add_adsorbate_to_surface()
-            #self._store_highest_positons()
 
         self.create_water_and_cation()
         self.create_pre_relaxation_structures()
@@ -125,7 +137,8 @@ class CreateCation:
 
         # create the surface
         miller_indices = [int(a) for a in self.facet]
-        surface = build.surface(bulk, indices=miller_indices, layers=self.metal_layers)
+        surface = build.surface(bulk, indices=miller_indices,
+                                layers=self.metal_layers)
 
         # Repeat the structure
         self.dimensions = [int(a) for a in self.dimensions]
@@ -156,9 +169,9 @@ class CreateCation:
         """Add constraints to the final surface, preserving already present
            constraints"""
         # TODO: Make this work for other constraints as well
-        fix_index=[]
+        fix_index = []
         if len(self.surface.constraints):
-            if hasattr(self.surface.constraints[0],'index'):
+            if hasattr(self.surface.constraints[0], 'index'):
                 fix_index.extend(self.surface.constraints[0].index)
             else:
                 print('Warning constraints were identified, but they do not '
@@ -170,9 +183,10 @@ class CreateCation:
                 print('Constraints are added based on "atom.tag" of Atoms')
 
         # Fix all atoms with a tag of 1
-        fix_index.extend([ a for a in range(len(self.surface)) if self.surface[a].tag == 1])
+        fix_index.extend([a for a in range(len(self.surface))
+                          if self.surface[a].tag == 1])
 
-        #Check if constraints were already present before and preserve them
+        # Check if constraints were already present before and preserve them
         # create the constraint
         if len(fix_index):
             constraint = constraints.FixAtoms(indices=fix_index)
@@ -183,22 +197,25 @@ class CreateCation:
         """If an adsorbate is provided, add it to the surface."""
         if self.adsorbate == 'CO2':
             co2_positions = [
-                [0.00042955, 10.69278681, 10.02427761 ],
-                [0.03581859,  9.53396647, 10.43134496 ],
-                [-0.0347786, 11.85195424, 10.43097203 ],
+                [0.00042955, 10.69278681, 10.02427761],
+                [0.03581859,  9.53396647, 10.43134496],
+                [-0.0347786, 11.85195424, 10.43097203],
             ]
             co2 = Atoms('CO2', positions=co2_positions)
-            height = data.covalent_radii[data.atomic_numbers[self.metal_name]] + 0.75
+            atnum = data.atomic_numbers[self.metal_name]
+            height = data.covalent_radii[atnum] + 0.75
             # get the position of the topmost metal atom
             position = self.surface.get_positions()[self.top_metal_atom]
-            build.add_adsorbate(self.surface, co2, height=height, position = position[0:2])
+            build.add_adsorbate(self.surface, co2, height=height,
+                                position=position[0:2])
             if self.constrain_adsorbate:
-                for i in range(1,4):
+                for i in range(1, 4):
                     self.surface[-i].tag = 1
         else:
             raise NotImplementedError('Only CO2 is implemented as an adorbate '
-                  'at the moment. Consider providing the surface with '
-                  'adsorbate via the `surface_from_file` keyword.')
+                                      'at the moment. Consider providing the '
+                                      'surface with adsorbate via the '
+                                      '`surface_from_file` keyword.')
 
     def _store_highest_positons(self):
         z_min = self.surface.get_positions()[:, 2].max()
@@ -208,7 +225,8 @@ class CreateCation:
         print(f'Lowest possible water structure at z-coordinate {z_min} AA')
 
     def create_water_and_cation(self):
-        """Create water and cation structures that are put on top of the metal surfaces."""
+        """Create water and cation structures that are put on top of the metal
+           surfaces."""
 
         # Create the water and cation atoms objects
         water = build.molecule('H2O')
@@ -228,28 +246,36 @@ class CreateCation:
 
             # Decide on the z-coordinate of the water
             z_chosen = z_min + i * self.water_layer_distance
-            x_chosen, y_chosen = get_random_xy_positions(self.surface.cell, n_atoms)
+            x_chosen, y_chosen = get_random_xy_positions(self.surface.cell,
+                                                         n_atoms)
 
-            # Create a copy of the atoms object to test if the xy positions are too close
+            # Create a copy of the atoms object to test if the xy positions
+            # are too close
             test_atoms = deepcopy(self.surface)
 
             # Add the atoms to the test_atoms
-            add_natoms_to_surface(test_atoms, n_atoms, atoms_all, x_chosen, y_chosen, z_chosen)
+            add_natoms_to_surface(test_atoms, n_atoms, atoms_all, x_chosen,
+                                  y_chosen, z_chosen)
 
             # Check if the xy positions are too close
             iteration = 0
-            while not check_xy_distance(test_atoms, cutoff_fraction = self.cutoff_fraction):
+            while not check_xy_distance(test_atoms,
+                                        cutoff_fraction=self.cutoff_fraction):
                 # The atoms are too close to each other, change the angles
                 iteration += 1
                 print(f'Iteration {iteration}')
                 # Try again, with a changed angle
                 test_atoms = deepcopy(self.surface)
-                add_natoms_to_surface(test_atoms, n_atoms, atoms_all, x_chosen, y_chosen, z_chosen)
+                add_natoms_to_surface(test_atoms, n_atoms, atoms_all, x_chosen,
+                                      y_chosen, z_chosen)
                 if iteration > 100:
                     # Create a new set of atoms
                     test_atoms = deepcopy(self.surface)
-                    x_chosen, y_chosen = get_random_xy_positions(self.surface.cell, n_atoms)
-                    add_natoms_to_surface(test_atoms, n_atoms, atoms_all, x_chosen, y_chosen, z_chosen)
+                    x_chosen, y_chosen = get_random_xy_positions(
+                        self.surface.cell,
+                        n_atoms)
+                    add_natoms_to_surface(test_atoms, n_atoms, atoms_all,
+                                          x_chosen, y_chosen, z_chosen)
                 if iteration > 200:
                     # Give up
                     raise Exception('Too many iterations')
@@ -259,9 +285,7 @@ class CreateCation:
 
     def create_pre_relaxation_structures(self):
         """Create folder structure"""
-        #if not len(self.surface.constraints):
         self.constrain_atoms()
-        #else:
 
         if self.debug_mode:
             view(self.surface)
@@ -272,18 +296,18 @@ class CreateCation:
         if self.adsorbate:
             self.metal_name = self.metal_name + '_' + self.adsorbate
         state_info = self.metal_name + '_' + self.facet + '_' + \
-                     self.cation + '_' + str(self.dimensions[0]) + \
-                     'x' + str(self.dimensions[1]) + '_' + \
-                     'cationlayer_' + str(self.layer_of_cation) + \
-                     '_' + str(no_water) + 'w_' + str(index)
+            self.cation + '_' + str(self.dimensions[0]) + \
+            'x' + str(self.dimensions[1]) + '_' + \
+            'cationlayer_' + str(self.layer_of_cation) + \
+            '_' + str(no_water) + 'w_' + str(index)
 
         while os.path.exists(state_info):
             index += 1
             state_info = self.metal_name + '_' + self.facet + '_' + \
-                         self.cation + '_' + str(self.dimensions[0]) + \
-                         'x' + str(self.dimensions[1]) + '_' + \
-                         'cationlayer_' + str(self.layer_of_cation) + \
-                         '_' + str(no_water) + 'w_' + str(index)
+                self.cation + '_' + str(self.dimensions[0]) + \
+                'x' + str(self.dimensions[1]) + '_' + \
+                'cationlayer_' + str(self.layer_of_cation) + \
+                '_' + str(no_water) + 'w_' + str(index)
 
         folder = os.path.join(os.getcwd(), state_info, 'pre_relaxation')
         Path(folder).mkdir(parents=True, exist_ok=True)
