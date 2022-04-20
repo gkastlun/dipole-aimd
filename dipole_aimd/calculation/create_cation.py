@@ -211,7 +211,7 @@ class CreateCation:
             if self.constrain_adsorbate:
                 for i in range(1, 4):
                     self.surface[-i].tag = 1
-        else:
+        elif self.adsorbate != '':
             raise NotImplementedError('Only CO2 is implemented as an adorbate '
                                       'at the moment. Consider providing the '
                                       'surface with adsorbate via the '
